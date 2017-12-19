@@ -93,8 +93,15 @@ def main(_):
       FLAGS.wanted_words.split(','), FLAGS.validation_percentage,
       FLAGS.testing_percentage, model_settings)
   fingerprint_size = model_settings['fingerprint_size']
+  # fingerprint_size가 뭘까
+  # 일단 모델 세팅한 후에 나온 값이고, 위에서 모델의 설정과 오디오 처리기에 대한 정의는 해둠
   label_count = model_settings['label_count']
+
   time_shift_samples = int((FLAGS.time_shift_ms * FLAGS.sample_rate) / 1000)
+  # Range to randomly shift the training audio by in time.
+  # time shifting을 적용, 전처리 과정으로 생각하면 될 듯하다. 
+  # pitch shifting 느낌
+
   # Figure out the learning rates for each training phase. Since it's often
   # effective to have high learning rates at the start of training, followed by
   # lower levels towards the end, the number of steps and learning rates can be
@@ -118,6 +125,7 @@ def main(_):
       model_settings,
       FLAGS.model_architecture,
       is_training=True)
+  # 모델의 세팅과 입력, 모델에서 사용할 구조(conv, ...)
 
   # Define loss and optimizer
   ground_truth_input = tf.placeholder(
@@ -154,12 +162,9 @@ def main(_):
 
   # Merge all the summaries and write them out to /tmp/retrain_logs (by default)
   merged_summaries = tf.summary.merge_all()
-  train_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/train',
-                                       sess.graph)
+  train_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/train', sess.graph)
   validation_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/validation')
-
   tf.global_variables_initializer().run()
-
   start_step = 1
 
   if FLAGS.start_checkpoint:
@@ -178,10 +183,23 @@ def main(_):
       'w') as f:
     f.write('\n'.join(audio_processor.words_list))
 
+  # The main roles of the tf.gfile module are :
+  # 1. To provide an API that is close to Python's file objects
+  # 2. To provide an implementation based on Tensorflow's C++ FileSystem API
+
+  # C++ FileSystem API Supports multiple file system implementations, including local files, Google Cloud storage, and HDFS
+  # these implementations for saving and loading checkpoints, wirting Tensorboard logs, and accessing training data
+  # However, if all of your files are local, you can use the regular Python file API without any problem.
+  # less-conventional filesystem에 필요하고, 그 외에는 일반적으로 사용하는 파이썬 API를 사용해도 된다.
+
   # Training loop.
   training_steps_max = np.sum(training_steps_list)
   for training_step in xrange(start_step, training_steps_max + 1):
     # Figure out what the current learning rate is.
+    # xrange는 ranage 함수와 차이가 있는데, 데이터 타입이 다르고 동작 방식이 다르다.
+    # xrange를 사용하는 경우가 지정하는 범위가 커질 경우 메모리 사용 효율이 커지게 된다.
+    # 자신에 속한 데이터 값을 한꺼번에 메모리에 로드하는 것이 아니라 해당 값에 접근할 때 마다 그 값을 하나씩 로딩하는 방식
+    # list에서 제공하는 편리한 함수를 못쓰지만, 순차적 접근이나 index를 통한 접근을 위주로 할 때는 xrange()가 훨씬 메모리 효율적이다.
     training_steps_sum = 0
     for i in range(len(training_steps_list)):
       training_steps_sum += training_steps_list[i]
